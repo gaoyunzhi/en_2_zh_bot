@@ -7,6 +7,7 @@ import yaml
 import threading
 from translate import Translator
 from datetime import datetime
+import sys
 translator= Translator(to_lang="zh")
 
 scheulded = False
