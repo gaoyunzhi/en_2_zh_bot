@@ -55,6 +55,7 @@ def en2zh(text): # in markdown format
 	pieces = [en2zhPiece(text) for text in pieces]
 	return ''.join(pieces)
 
+@log_on_fail(debug_group)
 def processMsg(original_messages):
 	msg = original_messages[0]
 	if msg.photo:
@@ -75,10 +76,18 @@ def processMsg(original_messages):
 			parse_mode='MarkdownV2', timeout = 20*60)
 	else:
 		text = en2zh(msg.text_markdown_v2)
-		msg.bot.send_message(msg.chat_id, text,
-			parse_mode='MarkdownV2', timeout = 20*60, 
-			disable_web_page_preview = (
-				not isUrl(text.split('[source]')[0])))
+		print(text)
+		try:
+			msg.bot.send_message(msg.chat_id, text,
+				parse_mode='MarkdownV2', timeout = 20*60, 
+				disable_web_page_preview = (
+					not isUrl(text.split('[source]')[0])))
+		except Exception as e:
+			print(str(e))
+			msg.bot.send_message(msg.chat_id, text,
+				parse_mode='Markdown', timeout = 20*60, 
+				disable_web_page_preview = (
+					not isUrl(text.split('[source]')[0])))
 
 @log_on_fail(debug_group)
 def process():
