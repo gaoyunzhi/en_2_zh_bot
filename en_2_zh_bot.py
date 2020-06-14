@@ -6,7 +6,7 @@ from telegram.ext import Updater, MessageHandler, Filters
 import yaml
 import threading
 from translate import Translator
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import sys
 translator= Translator(to_lang="zh")
 
@@ -32,7 +32,7 @@ def popMessages(msg):
 	return result
 
 def en2zhPiece(text):
-	if not text.strip():
+	if not text.strip() or text.startswith('['):
 		return text
 	result = translator.translate(text)
 	l_char_len = len(text) - len(text.lstrip())
