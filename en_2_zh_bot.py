@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from telegram_util import log_on_fail, splitCommand
+from telegram_util import log_on_fail, splitCommand, isUrl
 from telegram.ext import Updater, MessageHandler, Filters
 import yaml
 import threading
-import translate
+from translate import Translator
 from datetime import datetime
+translator= Translator(to_lang="zh")
 
 scheulded = False
 queue = []
@@ -29,21 +30,54 @@ def popMessages(msg):
 	queue = [m for m in queue if m.media_group_id != msg.media_group_id]
 	return result
 
-def translate(text): # in markdown format
-	return text
+def en2zhPiece(text):
+	if not text.strip():
+		return text
+	result = translator.translate(text)
+	l_char_len = len(text) - len(text.lstrip())
+	l_char = text[:l_char_len]
+	r_char_len = len(text) - len(text.rstrip())
+	if not r_char_len:
+		r_char = ''
+	else:
+		r_char = text[-r_char_len:]
+	return l_char + result + r_char
+
+def en2zh(text): # in markdown format
+	pieces = []
+	while text:
+		first_piece = text.split('[')[0]
+		text = text[len(first_piece):]
+		quote = rest.split(')')[0]
+		text = text[len(quote):]
+		pieces += [first_piece, quote]
+	pieces = [en2zhPiece(text) for text in pieces]
+	return ''.join(pieces)
 
 def processMsg(original_messages):
-	if original_messages.photo:
+	msg = original_messages[0]
+	if msg.photo:
 		media = []
 		for m in original_messages:
 			photo = InputMediaPhoto(m.photo[-1].file_id, 
-				caption=translate(m.caption_markdown),
-				parse_mode='Markdown')
-			if m.caption_markdown:
+				caption=en2zh(m.caption_markdown_v2),
+				parse_mode='MarkdownV2')
+			if m.caption_markdown_v2:
 				media = [photo] + media
 			else:
 				media.append(photo)
 		bot.send_media_group(msg.chat_id, media)
+	elif msg.document:
+		msg.bot.send_document(msg.chat_id, 
+			msg.document.file_id, 
+			caption=en2zh(msg.caption_markdown_v2), 
+			parse_mode='MarkdownV2', timeout = 20*60)
+	else:
+		text = en2zh(msg.caption_markdown_v2)
+		msg.bot.send_message(en2zh(msg.text_markdown_v2), 
+			parse_mode='MarkdownV2', timeout = 20*60, 
+			disable_web_page_preview = (
+				not isUrl(text.split('[source]')[0])))
 	if msg.chat.username == 'twitter_translate':
 		for r in original_messages:
 			r.delete()
