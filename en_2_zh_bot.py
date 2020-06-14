@@ -4,14 +4,15 @@
 from telegram_util import log_on_fail, splitCommand
 from telegram.ext import Updater, MessageHandler, Filters
 import yaml
-from db import DB
 import threading
-from stream import Stream
-import tweepy
-import json
 import translate
 
-db = DB()
+scheulded = False
+queue = []
+
+wait = 60 * 5
+if 'test' in sys.argv:
+	wait = 1
 
 with open('credential') as f:
 	credential = yaml.load(f, Loader=yaml.FullLoader)
@@ -19,58 +20,63 @@ with open('credential') as f:
 tele = Updater(credential['bot'], use_context=True)  # @en_2_zh_bot
 debug_group = tele.bot.get_chat(420074357)
 
-import requests
+def popMessages(msg):
+	global queue
+	if not msg.media_group_id:
+		return []
+	result = [m for (reciever, m) in queue if m.media_group_id == msg.media_group_id]
+	queue = [(reciever, m) for (reciever, m) in queue if m.media_group_id != msg.media_group_id]
+	return result
 
-# 翻译函数，word 需要翻译的内容
-def translate(word):
-    # 有道词典 api
-    url = 'http://fanyi.youdao.com/translate?smartresult=dict&smartresult=rule&smartresult=ugc&sessionFrom=null'
-    # 传输的参数，其中 i 为需要翻译的内容
-    key = {
-        'type': "AUTO",
-        'i': word,
-        "doctype": "json",
-        "version": "2.1",
-        "keyfrom": "fanyi.web",
-        "ue": "UTF-8",
-        "action": "FY_BY_CLICKBUTTON",
-        "typoResult": "true"
-    }
-    # key 这个字典为发送给有道词典服务器的内容
-    response = requests.post(url, data=key)
-    # 判断服务器是否相应成功
-    if response.status_code == 200:
-        # 然后相应的结果
-        return response.text
-    else:
-        print("有道词典调用失败")
-        # 相应失败就返回空
-        return None
+@log_on_fail(debug_group)
+def process():
+	global queue
+	new_queue = []
+	while queue:
+		reciever, msg = queue.pop()
+		epoch = datetime(1970, 1, 1, tzinfo=timezone.utc)
+		timestamp = (msg.date.replace(tzinfo=timezone.utc) - epoch) / timedelta(seconds=1)
+		if time.time() - timestamp < wait:
+			new_queue.append((reciever, msg))
+			continue
+		try:
+			r = bot.forward_message(chat_id = test_group.id, 
+				from_chat_id = msg.chat_id, message_id = msg.message_id)
+			r.delete()
+		except:
+			continue
+		# TODO: support text, docs, movies also
+		if not msg.photo:
+			continue
+		media = []
+		for m in [msg] + popMessages(msg):
+			photo = InputMediaPhoto(m.photo[-1].file_id, 
+				caption=m.caption_markdown and cc.convert(m.caption_markdown),
+				parse_mode='Markdown')
+			if m.caption_markdown:
+				media = [photo] + media
+			else:
+				media.append(photo)
+		bot.send_media_group('@' + reciever, media)
+	queue = new_queue
+	if queue:
+		threading.Timer(wait, process).start()
+	else:
+		global scheulded
+		scheulded = False
 
-def get_reuslt(repsonse):
-    # 通过 json.loads 把返回的结果加载成 json 格式
-    result = json.loads(repsonse)
-    print(result)
-    print ("输入的词为：%s" % result['translateResult'][0][0]['src'])
-    print ("翻译结果为：%s" % result['translateResult'][0][0]['tgt'])
-
-def main():
-    print("本程序调用有道词典的API进行翻译，可达到以下效果：")
-    print("外文-->中文")
-    print("中文-->英文")
-    word = input('请输入你想要翻译的词或句：')
-    list_trans = translate(word)
-    get_reuslt(list_trans)
+def handleUpdate(update, context):
+	msg = update.effective_message
+	if not msg:
+		return
+	queue.append(msg)
+	global scheulded
+	if not scheulded:
+		scheulded = True
+		threading.Timer(wait, process).start()
 
 if __name__ == '__main__':
-    main()
-
-if __name__ == '__main__':
-	twitter_stream.forceReload()
-	threading.Timer(10 * 60, twitterLoop).start() 
 	dp = tele.dispatcher
-	dp.add_handler(MessageHandler(Filters.command, handleCommand))
-	dp.add_handler(MessageHandler(Filters.private & (~Filters.command), handleHelp))
-	dp.add_handler(MessageHandler(Filters.private & Filters.command, handleStart), group=2)
+	dp.add_handler(MessageHandler(~Filters.command, handleUpdate))
 	tele.start_polling()
 	tele.idle()
