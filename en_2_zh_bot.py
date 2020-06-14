@@ -70,20 +70,17 @@ def processMsg(original_messages):
 			else:
 				media.append(photo)
 		msg.bot.send_media_group(msg.chat_id, media)
-	elif msg.document:
-		msg.bot.send_document(msg.chat_id, 
-			msg.document.file_id, 
+	elif msg.video:
+		msg.bot.send_video(msg.chat_id, 
+			msg.video.file_id, 
 			caption=en2zh(msg.caption_markdown_v2), 
 			parse_mode='MarkdownV2', timeout = 20*60)
 	else:
-		text = en2zh(msg.caption_markdown_v2)
-		msg.bot.send_message(en2zh(msg.text_markdown_v2), 
+		text = en2zh(msg.text_markdown_v2)
+		msg.bot.send_message(msg.chat_id, text,
 			parse_mode='MarkdownV2', timeout = 20*60, 
 			disable_web_page_preview = (
 				not isUrl(text.split('[source]')[0])))
-	if msg.chat.username == 'twitter_translate':
-		for r in original_messages:
-			r.delete()
 
 @log_on_fail(debug_group)
 def process():
