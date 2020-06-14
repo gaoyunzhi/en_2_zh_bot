@@ -15,9 +15,7 @@ translator= Translator(to_lang="zh")
 scheulded = False
 queue = []
 
-wait = 60 * 5
-if 'test' in sys.argv:
-	wait = 10
+wait = 10
 
 with open('credential') as f:
 	credential = yaml.load(f, Loader=yaml.FullLoader)
