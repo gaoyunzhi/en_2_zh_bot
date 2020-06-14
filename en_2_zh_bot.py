@@ -8,6 +8,8 @@ import threading
 from translate import Translator
 from datetime import datetime, timedelta, timezone
 import sys
+import time
+from telegram import InputMediaPhoto
 translator= Translator(to_lang="zh")
 
 scheulded = False
@@ -15,7 +17,7 @@ queue = []
 
 wait = 60 * 5
 if 'test' in sys.argv:
-	wait = 1
+	wait = 10
 
 with open('credential') as f:
 	credential = yaml.load(f, Loader=yaml.FullLoader)
@@ -49,7 +51,7 @@ def en2zh(text): # in markdown format
 	while text:
 		first_piece = text.split('[')[0]
 		text = text[len(first_piece):]
-		quote = rest.split(')')[0]
+		quote = text.split(')')[0]
 		text = text[len(quote):]
 		pieces += [first_piece, quote]
 	pieces = [en2zhPiece(text) for text in pieces]
@@ -67,7 +69,7 @@ def processMsg(original_messages):
 				media = [photo] + media
 			else:
 				media.append(photo)
-		bot.send_media_group(msg.chat_id, media)
+		msg.bot.send_media_group(msg.chat_id, media)
 	elif msg.document:
 		msg.bot.send_document(msg.chat_id, 
 			msg.document.file_id, 
